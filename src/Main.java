@@ -4,6 +4,30 @@ import java.util.Random;
 
 public class Main {
 
+    static BigInteger rtlModExp(BigInteger a, BigInteger exp, BigInteger mod) {
+
+        int n = exp.bitLength();
+        int set;
+
+        BigInteger y = new BigInteger("1");
+        for (int i = 0; i < n; i++) {
+            set = exp.getLowestSetBit();
+            if (set == i) {
+                y = y.multiply(a).mod(mod);
+            }
+            a = a.multiply(a).mod(mod);
+
+            // chop off last bit so that i might be equal to set
+            exp = exp.shiftRight(1);
+        }
+        return y;
+    }
+
+    static BigInteger ltrModExp(BigInteger x, BigInteger exp, BigInteger mod) {
+
+        return new BigInteger("0");
+    }
+
     public static void main(String[] args) {
 
         // prime modulus
@@ -19,17 +43,17 @@ public class Main {
         BigInteger b = new BigInteger(1023, new Random());
 
         // my public key
-        // TODO implement modPow function
-        BigInteger B = g.modPow(b, p);
+        BigInteger B = rtlModExp(g, b, p);
 
         // shared key
-        // TODO
-        BigInteger s = A.modPow(b, p);
+        BigInteger s = rtlModExp(A, b, p);
 
         // generate AES key
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         md.update(s.toByteArray());
         byte[] digest = md.digest();
         BigInteger k = new BigInteger(digest);
+
+
     }
 }
