@@ -1,4 +1,5 @@
 import java.math.BigInteger;
+import java.security.MessageDigest;
 import java.util.Random;
 
 public class Main {
@@ -26,6 +27,9 @@ public class Main {
         BigInteger s = A.modPow(b, p);
 
         // generate AES key
-        
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        md.update(s.toByteArray());
+        byte[] digest = md.digest();
+        BigInteger k = new BigInteger(digest);
     }
 }
