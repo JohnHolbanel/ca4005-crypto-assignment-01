@@ -1,9 +1,23 @@
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Random;
 
 public class Main {
 
+    /**
+     *  pseudo code for right to left variant of the square and multiply algorithm for calculating y = a^x (mod p)
+     *   - n is the number of bits in the exponent
+     *
+     *  y = 1
+     *  for i = 0 to n-1 do
+     *      if x[i] = 1 then y = (y * a) mod p
+     *      a = (a * a) mod p
+     */
     static BigInteger rtlModExp(BigInteger a, BigInteger exp, BigInteger mod) {
 
         int n = exp.bitLength();
@@ -12,7 +26,7 @@ public class Main {
         BigInteger y = new BigInteger("1");
         for (int i = 0; i < n; i++) {
             set = exp.getLowestSetBit();
-            if (set == i) {
+            if (set == 0) {
                 y = y.multiply(a).mod(mod);
             }
             a = a.multiply(a).mod(mod);
@@ -23,9 +37,27 @@ public class Main {
         return y;
     }
 
-    static BigInteger ltrModExp(BigInteger x, BigInteger exp, BigInteger mod) {
+    /**
+     *  pseudo code for left to right variant of the square and multiply algorithm for calculating y = a^x (mod p)
+     *   - n is the number of bits in the exponent
+     *
+     *  y = 1
+     *  for i = n-1 downto 0 do
+     *      y = (y * y) mod p
+     *      if x[i] = 1 then y = (y * a) mod p
+     */
+    static BigInteger ltrModExp(BigInteger a, BigInteger exp, BigInteger mod) {
 
-        return new BigInteger("0");
+        int n = exp.bitLength();
+
+        BigInteger y = new BigInteger("1");
+        for (int i = n-1; i >= 0; i--) {
+            y = y.multiply(y).mod(mod);
+            if (exp.testBit(i)) {
+                y = y.multiply(a).mod(mod);
+            }
+        }
+        return y;
     }
 
     public static void main(String[] args) {
@@ -48,11 +80,24 @@ public class Main {
         // shared key
         BigInteger s = rtlModExp(A, b, p);
 
-        // generate AES key
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        md.update(s.toByteArray());
-        byte[] digest = md.digest();
-        BigInteger k = new BigInteger(digest);
+        try {
+            // generate AES key
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(s.toByteArray());
+            byte[] digest = md.digest();
+            BigInteger k = new BigInteger(digest);
+
+            // create IV
+            IvParameterSpec iv = new IvParameterSpec(new BigInteger(128, new Random()).toByteArray());
+            SecretKeySpec keySpec = new SecretKeySpec(k.toByteArray(), "AES");
+
+            // init ciphr
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+
+
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+            System.exit(1);
+        }
 
 
     }
