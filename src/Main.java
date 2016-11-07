@@ -65,6 +65,13 @@ public class Main {
         return y;
     }
 
+    static void pad(byte[] b, int len, int padLen) {
+        b[len] = (byte) 128;
+        for (int i = 1; i < padLen; i++) {
+            b[len + 1] = (byte) 0;
+        }
+    }
+
     public static void main(String[] args) {
 
         // prime modulus
@@ -97,16 +104,22 @@ public class Main {
             SecretKeySpec keySpec = new SecretKeySpec(k.toByteArray(), "AES");
 
             // init cipher
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
 
             // read in file to be encrypted
             // TODO var names
             // TODO get length of the file before creating the byte array and pad to multiple of (128?)
             File inputFile = new File(args[0]);
+            int len = (int) inputFile.length();
+            int padLen = 16 - (len % 16);
+
             FileInputStream inputStream = new FileInputStream(inputFile);
-            byte[] inputBytes = new byte[(int) inputFile.length()];
+            byte[] inputBytes = new byte[len + padLen];
             inputStream.read(inputBytes);
+
+            // pad the input
+            pad(inputBytes, len, padLen);
 
             // encrypt the file to a byte array
             byte[] outputBytes = cipher.doFinal(inputBytes);
