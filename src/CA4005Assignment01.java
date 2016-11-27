@@ -16,7 +16,7 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 
-public class Main {
+public class CA4005Assignment01 {
 
     /**
      *  pseudo code for left to right variant of the square and multiply algorithm for calculating y = a^x (mod p)
@@ -105,31 +105,31 @@ public class Main {
             cipher.init(Cipher.ENCRYPT_MODE, k, iv);
 
             // read in file to be encrypted
-            // TODO var names
-            File inputFile = new File(args[0]);
-            int len = (int) inputFile.length();
+            File f = new File(args[0]);
+            FileInputStream stream = new FileInputStream(f);
+
+            int len = (int) f.length();
             int padLen = 16 - (len % 16);
 
-            FileInputStream inputStream = new FileInputStream(inputFile);
-            byte[] inputBytes = new byte[len + padLen];
-            inputStream.read(inputBytes);
+            byte[] input = new byte[len + padLen];
+            stream.read(input);
 
             // close the input stream
-            inputStream.close();
+            stream.close();
 
             // pad the input
-            pad(inputBytes, len, padLen);
+            pad(input, len, padLen);
 
             // encrypt the file to a byte array
-            byte[] outputBytes = cipher.doFinal(inputBytes);
+            byte[] output = cipher.doFinal(input);
 
-            // write encrypted hex to file
-            writeStringToFile("encrypted-output", DatatypeConverter.printHexBinary(outputBytes));
+            // write encrypted byte array to file in hex format
+            writeStringToFile("encrypted-output", DatatypeConverter.printHexBinary(output));
 
-            // write iv to file
+            // write iv to file in hex format
             writeStringToFile("iv-hex", DatatypeConverter.printHexBinary(iv.getIV()));
 
-            // write public key to file
+            // write public key to file in hex format
             writeStringToFile("pub-key", B.toString(16));
 
         } catch ( NoSuchAlgorithmException
@@ -140,9 +140,7 @@ public class Main {
                 | IllegalBlockSizeException
                 | BadPaddingException e ) {
 
-            // TODO throw exception
             System.out.println(e);
         }
-
     }
 }
