@@ -4,54 +4,30 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.math.BigInteger;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Random;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.util.List;
+
+import static java.util.Collections.singletonList;
 
 public class Main {
-
-    /**
-     *  pseudo code for right to left variant of the square and multiply algorithm for calculating y = a^x (mod p)
-     *   - n is the number of bits in the exponent
-     *
-     *  y = 1
-     *  for i = 0 to n-1 do
-     *      if x[i] = 1 then y = (y * a) mod p
-     *      a = (a * a) mod p
-     */
-    static BigInteger rtlModExp(BigInteger a, BigInteger exp, BigInteger mod) {
-
-        int n = exp.bitLength();
-        int set;
-
-        BigInteger y = new BigInteger("1");
-        for (int i = 0; i < n; i++) {
-            set = exp.getLowestSetBit();
-            if (set == 0) {
-                y = y.multiply(a).mod(mod);
-            }
-            a = a.multiply(a).mod(mod);
-
-            // chop off last bit so that i might be equal to set
-            exp = exp.shiftRight(1);
-        }
-        return y;
-    }
 
     /**
      *  pseudo code for left to right variant of the square and multiply algorithm for calculating y = a^x (mod p)
      *   - n is the number of bits in the exponent
      *
      *  y = 1
-     *  for i = n-1 downto 0 do
+     *  for i = n-1 down to 0 do
      *      y = (y * y) mod p
      *      if x[i] = 1 then y = (y * a) mod p
      */
-    static BigInteger ltrModExp(BigInteger a, BigInteger exp, BigInteger mod) {
+    private static BigInteger ltrModExp(BigInteger a, BigInteger exp, BigInteger mod) {
 
         int n = exp.bitLength();
 
@@ -65,11 +41,36 @@ public class Main {
         return y;
     }
 
-    static void pad(byte[] b, int len, int padLen) {
+    private static void pad(byte[] b, int len, int padLen) {
         b[len] = (byte) 128;
         for (int i = 1; i < padLen; i++) {
             b[len + 1] = (byte) 0;
         }
+    }
+
+    private static SecretKeySpec genAES256Key(BigInteger sharedKey) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] k = md.digest(sharedKey.toByteArray());
+        return new SecretKeySpec(k, "AES");
+    }
+
+    private static IvParameterSpec genInitVector() {
+        // iv must be 16 bytes long
+        byte[] initVector = new byte[16];
+
+        // fill the array with a secure random number generator
+        SecureRandom rnd = new SecureRandom();
+        rnd.nextBytes(initVector);
+
+        // return the Initialisation Vector object
+        return new IvParameterSpec(initVector);
+    }
+
+    // output a single string to a file using the preferred method as of Java 8
+    private static void writeStringToFile(String filepath, String output) throws IOException {
+        Charset utf8 = StandardCharsets.UTF_8;
+        List<String> out = singletonList(output);
+        Files.write(Paths.get(filepath), out, utf8);
     }
 
     public static void main(String[] args) {
@@ -84,32 +85,27 @@ public class Main {
         BigInteger A = new BigInteger("5af3e806 e0fa466d c75de601 86760516 792b70fd cd72a5b6 238e6f6b 76ece1f1 b38ba4e2 10f61a2b 84ef1b5d c4151e79 9485b217 1fcf318f 86d42616 b8fd8111 d59552e4 b5f228ee 838d535b 4b987f1e af3e5de3 ea0c403a 6c38002b 49eade15 171cb861 b3677324 60e3a984 2b532761 c16218c4 fea51be8 ea024838 5f6bac0d".replace(" ", ""), 16);
 
         // my private key
-        BigInteger b = new BigInteger(1023, new Random());
+        BigInteger b = new BigInteger(1023, new SecureRandom());
 
         // my public key
-        BigInteger B = rtlModExp(g, b, p);
+        BigInteger B = ltrModExp(g, b, p);
 
         // shared key
-        BigInteger s = rtlModExp(A, b, p);
+        BigInteger s = ltrModExp(A, b, p);
 
         try {
-            // generate AES key
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(s.toByteArray());
-            byte[] digest = md.digest();
-            BigInteger k = new BigInteger(digest);
+            // generate 256 bit AES key k from shared key s
+            SecretKeySpec k = genAES256Key(s);
 
-            // create IV
-            IvParameterSpec iv = new IvParameterSpec(new BigInteger(128, new Random()).toByteArray());
-            SecretKeySpec keySpec = new SecretKeySpec(k.toByteArray(), "AES");
+            // generate IV
+            IvParameterSpec iv = genInitVector();
 
-            // init cipher
+            // initialise cipher
             Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, k, iv);
 
             // read in file to be encrypted
             // TODO var names
-            // TODO get length of the file before creating the byte array and pad to multiple of (128?)
             File inputFile = new File(args[0]);
             int len = (int) inputFile.length();
             int padLen = 16 - (len % 16);
@@ -118,20 +114,23 @@ public class Main {
             byte[] inputBytes = new byte[len + padLen];
             inputStream.read(inputBytes);
 
+            // close the input stream
+            inputStream.close();
+
             // pad the input
             pad(inputBytes, len, padLen);
 
             // encrypt the file to a byte array
             byte[] outputBytes = cipher.doFinal(inputBytes);
 
-            // output encrypted file
-            FileOutputStream outputStream = new FileOutputStream(new File("./output"));
-            outputStream.write(outputBytes);
+            // write encrypted hex to file
+            writeStringToFile("encrypted-output", DatatypeConverter.printHexBinary(outputBytes));
 
-            // close the input and output streams
-            inputStream.close();
-            outputStream.close();
+            // write iv to file
+            writeStringToFile("iv-hex", DatatypeConverter.printHexBinary(iv.getIV()));
 
+            // write public key to file
+            writeStringToFile("pub-key", B.toString(16));
 
         } catch ( NoSuchAlgorithmException
                 | NoSuchPaddingException
@@ -142,7 +141,7 @@ public class Main {
                 | BadPaddingException e ) {
 
             // TODO throw exception
-            System.exit(1);
+            System.out.println(e);
         }
 
     }
