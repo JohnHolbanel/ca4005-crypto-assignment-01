@@ -1,6 +1,8 @@
 # CA4005 Cryptography and Security Protocols Assignment 1
 http://www.computing.dcu.ie/~hamilton/teaching/CA4005/Assignments/Assignment1.html
 
+**Mark Received: 14/15**
+
 ## Symmetric Encryption Using Diffie-Hellman Key Agreement
 
   
